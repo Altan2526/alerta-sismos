@@ -1,0 +1,47 @@
+name: Monitor de Sismos
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monitor-sismos
+  cancel-in-progress: false
+
+jobs:
+  verificar-sismos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar monitor de sismos
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MAGNITUD_MINIMA: "4.5"
+        run: python sismos.py
+
+      - name: Guardar registro si hubo alertas nuevas
+        run: |
+          if [ -n "$(git status --porcelain sismos_enviados.txt)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add sismos_enviados.txt
+            git commit -m "Actualiza registro de sismos notificados"
+            git push
+          fi
